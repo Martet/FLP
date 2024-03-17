@@ -1,9 +1,9 @@
 all: flp-fun
 
 flp-fun: main.hs
-	ghc --make $^ -o $@
+	ghc -Wall --make $^ -o $@
 
 clean:
-	rm *.o *.hi
+	rm -f *.o *.hi flp-fun
 
 .PHONY: all clean
