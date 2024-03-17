@@ -1,7 +1,6 @@
 import System.Environment
-import System.IO
 import System.Exit
-import Debug.Trace
+--import Debug.Trace
 import qualified Data.Text as T
 
 data Tree =
@@ -14,6 +13,7 @@ data Arguments =
     | Learn String
     deriving Show
 
+main :: IO ()
 main = do
     args <- getArgs
     case parseArgs args of
@@ -23,7 +23,7 @@ main = do
                 Just decisionTree@(Node {}) -> do
                     dataContent <- readFile dataFile
                     mapM_ (putStrLn . classify decisionTree) (parseInput dataContent)
-                Nothing ->
+                _ ->
                     die "Error parsing tree"
         Just (Learn dataFile) -> do
             dataContent <- readFile dataFile
