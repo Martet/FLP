@@ -20,21 +20,21 @@ main = do
         Just (Classify treeFile dataFile) -> do
             treeContent <- readFile treeFile
             case parseTree treeContent of
-                Just decisionTree@(Node _ _ _ _) -> do
+                Just decisionTree@(Node {}) -> do
                     dataContent <- readFile dataFile
-                    mapM_ putStrLn $ map (classify decisionTree) (parseInput dataContent)
+                    mapM_ (putStrLn . classify decisionTree) (parseInput dataContent)
                 Nothing ->
                     die "Error parsing tree"
         Just (Learn dataFile) -> do
             dataContent <- readFile dataFile
             let inputData = parseInput dataContent
-            putStrLn $ show inputData
+            print inputData
         Nothing ->
             die "Wrong arguments"
 
 parseArgs :: [String] -> Maybe Arguments
-parseArgs ("-1":treeFile:dataFile:[]) = Just (Classify treeFile dataFile)
-parseArgs ("-2":dataFile:[]) = Just (Learn dataFile)
+parseArgs ["-1", treeFile, dataFile] = Just (Classify treeFile dataFile)
+parseArgs ["-2", dataFile] = Just (Learn dataFile)
 parseArgs _ = Nothing
 
 parseTree :: String -> Maybe Tree
