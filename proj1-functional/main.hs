@@ -1,5 +1,5 @@
-import System.Environment
-import System.Exit
+import System.Environment ( getArgs )
+import System.Exit ( die )
 --import Debug.Trace
 import qualified Data.Text as T
 
@@ -10,7 +10,7 @@ data Tree =
 
 data Arguments =
     Classify String String
-    | Learn String
+    | Train String
     deriving Show
 
 main :: IO ()
@@ -25,7 +25,7 @@ main = do
                     mapM_ (putStrLn . classify decisionTree) (parseInput dataContent)
                 _ ->
                     die "Error parsing tree"
-        Just (Learn dataFile) -> do
+        Just (Train dataFile) -> do
             dataContent <- readFile dataFile
             let inputData = parseInput dataContent
             print inputData
@@ -34,7 +34,7 @@ main = do
 
 parseArgs :: [String] -> Maybe Arguments
 parseArgs ["-1", treeFile, dataFile] = Just (Classify treeFile dataFile)
-parseArgs ["-2", dataFile] = Just (Learn dataFile)
+parseArgs ["-2", dataFile] = Just (Train dataFile)
 parseArgs _ = Nothing
 
 parseTree :: String -> Maybe Tree
@@ -45,20 +45,21 @@ parseTree s =
 
 parseTree' :: [String] -> Maybe (Tree, [String])
 parseTree' [] = Nothing
-parseTree' (x:xs) = do
-    let splitLine = words x
+parseTree' (x:xs) =
     case head splitLine of
-        "Node:" -> do
-            (left, afterLeft) <- parseTree' xs
-            (right, rest) <- parseTree' afterLeft
-            return (Node
-                    (read $ init (splitLine !! 1))
-                    (read $ splitLine !! 2)
-                    left
-                    right,
-                rest)
-        "Leaf:" -> return (Leaf (last splitLine), xs)
+        "Node:" ->
+            Just (Node
+                (read $ init (splitLine !! 1))
+                (read $ splitLine !! 2)
+                left
+                right, rest)
+            where
+                Just (right, rest) = parseTree' afterLeft
+                Just (left, afterLeft) = parseTree' xs
+        "Leaf:" -> Just (Leaf (last splitLine), xs)
         _ -> Nothing
+    where
+        splitLine = words x
 
 parseLine :: String -> [Float]
 parseLine line =
