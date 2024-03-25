@@ -6,12 +6,27 @@ import qualified Data.Text as T
 data Tree =
     Node Int Float Tree Tree
     | Leaf String
-    deriving Show
 
 data Arguments =
     Classify String String
     | Train String
     deriving Show
+
+data Datapoint =
+    Datapoint [Float] String
+    deriving Show
+
+instance Show Tree where
+    show n@(Node {}) = showHelper n 2
+    show l@(Leaf {}) = showHelper l 2
+
+showHelper :: Tree -> Int -> String
+showHelper (Node i t n1 n2) indent =
+    "Node: " ++ show i ++ ", " ++ show t ++ "\n" ++
+        take indent (repeat ' ') ++ showHelper n1 (indent + 2) ++ "\n" ++
+        take indent (repeat ' ') ++ showHelper n2 (indent + 2)
+showHelper (Leaf l) _ =
+    "Leaf: " ++ l
 
 main :: IO ()
 main = do
@@ -22,12 +37,12 @@ main = do
             case parseTree treeContent of
                 Just decisionTree@(Node {}) -> do
                     dataContent <- readFile dataFile
-                    mapM_ (putStrLn . classify decisionTree) (parseInput dataContent)
+                    mapM_ (putStrLn . classify decisionTree) (parseInput dataContent parseLine)
                 _ ->
                     die "Error parsing tree"
         Just (Train dataFile) -> do
             dataContent <- readFile dataFile
-            let inputData = parseInput dataContent
+            let inputData = parseInput dataContent parseLabeledLine
             print inputData
         Nothing ->
             die "Wrong arguments"
@@ -61,13 +76,19 @@ parseTree' (x:xs) =
     where
         splitLine = words x
 
+parseInput :: String -> (String -> a) -> [a]
+parseInput input parse =
+    map parse (lines input)
+
 parseLine :: String -> [Float]
 parseLine line =
     map (read . T.unpack) (T.splitOn (T.pack ",") (T.pack line))
 
-parseInput :: String -> [[Float]]
-parseInput input =
-    map parseLine (lines input)
+parseLabeledLine :: String -> Datapoint
+parseLabeledLine line =
+    Datapoint (map read $ init values) (last values)
+    where
+        values = map (T.unpack) (T.splitOn (T.pack ",") (T.pack line))
 
 classify :: Tree -> [Float] -> String
 classify (Leaf label) _ = label
