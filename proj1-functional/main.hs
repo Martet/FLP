@@ -5,7 +5,7 @@ import qualified Data.Text as T
 import Data.List ( nub )
 
 data Tree =
-    Node Int Float Tree Tree
+    Node Int Double Tree Tree
     | Leaf String
 
 data Arguments =
@@ -14,7 +14,7 @@ data Arguments =
     deriving Show
 
 data Datapoint =
-    Datapoint [Float] String
+    Datapoint [Double] String
     deriving Show
 
 instance Show Tree where
@@ -81,7 +81,7 @@ parseInput :: String -> (String -> a) -> [a]
 parseInput input parse =
     map parse (lines input)
 
-parseLine :: String -> [Float]
+parseLine :: String -> [Double]
 parseLine line =
     map (read . T.unpack) (T.splitOn (T.pack ",") (T.pack line))
 
@@ -91,20 +91,20 @@ parseLabeledLine line =
     where
         values = map (T.unpack) (T.splitOn (T.pack ",") (T.pack line))
 
-classify :: Tree -> [Float] -> String
+classify :: Tree -> [Double] -> String
 classify (Leaf label) _ = label
 classify (Node index threshold left right) values
     | values !! index < threshold = classify left values
     | otherwise = classify right values
 
-calcGini :: [Datapoint] -> Float
+calcGini :: [Datapoint] -> Double
 calcGini dataset =
-    1.0 - sum [(fromIntegral (length l) / numLabels) ^ 2 | l <- [filter (== cur) labels | cur <- nub labels]]
+    1 - sum [(fromIntegral (length l) / numLabels) ^ (2 :: Int) | l <- [filter (== cur) labels | cur <- nub labels]]
     where
         numLabels = fromIntegral (length labels)
         labels = [l | (Datapoint _ l) <- dataset]
 
-giniForSplit :: ([Datapoint], [Datapoint]) -> Float
+giniForSplit :: ([Datapoint], [Datapoint]) -> Double
 giniForSplit (d1, d2) =
     (calcGini d1) * len1 / total + (calcGini d2) * len2 / total
     where
@@ -112,26 +112,26 @@ giniForSplit (d1, d2) =
         len2 = fromIntegral $ length d2
         total = len1 + len2
 
-splitData :: Int -> [Datapoint] -> Float -> ([Datapoint], [Datapoint], Float)
+splitData :: Int -> [Datapoint] -> Double -> ([Datapoint], [Datapoint], Double)
 splitData i dataset threshold =
     ([d | d@(Datapoint features _) <- dataset, features !! i < threshold],
     [d | d@(Datapoint features _) <- dataset, features !! i >= threshold],
     threshold)
 
-getSplits :: [Datapoint] -> Int -> [(([Datapoint], [Datapoint]), Int, Float, Float)]
+getSplits :: [Datapoint] -> Int -> [(([Datapoint], [Datapoint]), Int, Double, Double)]
 getSplits dataset i =
     [((d1, d2), i, giniForSplit (d1, d2), threshold) | (d1, d2, threshold) <- map (splitData i dataset) splitPoints]
     where
         column = [features !! i | Datapoint features _ <- dataset]
         splitPoints = [(x2 + x1) / 2 | (x1, x2) <- zip column (tail column)]
 
-bestSplit :: (([Datapoint], [Datapoint]), Int, Float, Float) -> [(([Datapoint], [Datapoint]), Int, Float, Float)] -> (([Datapoint], [Datapoint]), Int, Float, Float)
+bestSplit :: (([Datapoint], [Datapoint]), Int, Double, Double) -> [(([Datapoint], [Datapoint]), Int, Double, Double)] -> (([Datapoint], [Datapoint]), Int, Double, Double)
 bestSplit (bestSets, bestI, bestGini, bestT) ((datasets, i, gini, t):xs)
     | gini < bestGini = bestSplit (datasets, i, gini, t) xs
     | otherwise = bestSplit (bestSets, bestI, bestGini, bestT) xs
 bestSplit best [] = best
 
-findBestSplit :: [Datapoint] -> (([Datapoint], [Datapoint]), Int, Float)
+findBestSplit :: [Datapoint] -> (([Datapoint], [Datapoint]), Int, Double)
 findBestSplit dataset =
     ((d1, d2), i, t)
     where
