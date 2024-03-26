@@ -24,8 +24,8 @@ instance Show Tree where
 showHelper :: Tree -> Int -> String
 showHelper (Node i t n1 n2) indent =
     "Node: " ++ show i ++ ", " ++ show t ++ "\n" ++
-        take indent (repeat ' ') ++ showHelper n1 (indent + 2) ++ "\n" ++
-        take indent (repeat ' ') ++ showHelper n2 (indent + 2)
+        replicate indent ' ' ++ showHelper n1 (indent + 2) ++ "\n" ++
+        replicate indent ' ' ++ showHelper n2 (indent + 2)
 showHelper (Leaf l) _ =
     "Leaf: " ++ l
 
@@ -89,7 +89,7 @@ parseLabeledLine :: String -> Datapoint
 parseLabeledLine line =
     Datapoint (map read $ init values) (last values)
     where
-        values = map (T.unpack) (T.splitOn (T.pack ",") (T.pack line))
+        values = map T.unpack (T.splitOn (T.pack ",") (T.pack line))
 
 classify :: Tree -> [Double] -> String
 classify (Leaf label) _ = label
@@ -106,7 +106,7 @@ calcGini dataset =
 
 giniForSplit :: ([Datapoint], [Datapoint]) -> Double
 giniForSplit (d1, d2) =
-    (calcGini d1) * len1 / total + (calcGini d2) * len2 / total
+    calcGini d1 * len1 / total + calcGini d2 * len2 / total
     where
         len1 = fromIntegral $ length d1
         len2 = fromIntegral $ length d2
@@ -135,8 +135,8 @@ findBestSplit :: [Datapoint] -> (([Datapoint], [Datapoint]), Int, Double)
 findBestSplit dataset =
     ((d1, d2), i, t)
     where
-        splits = map (bestSplit (([],[]), 0, 99, 0)) (map (getSplits dataset) [0..len])
-        len = (featureCount $ head dataset) - 1
+        splits = map (bestSplit (([],[]), 0, 99, 0) . getSplits dataset) [0..len]
+        len = featureCount (head dataset) - 1
         ((d1, d2), i, _, t) = bestSplit (([],[]), 0, 99, 0) splits
 
 featureCount :: Datapoint -> Int
