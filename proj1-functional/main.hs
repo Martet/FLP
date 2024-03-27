@@ -1,9 +1,8 @@
 import System.Environment ( getArgs )
 import System.Exit ( exitFailure )
 import System.IO ( hPutStrLn, stderr )
---import Debug.Trace
+import Data.List ( nub, sortOn )
 import qualified Data.Text as T
-import Data.List ( nub )
 
 data Tree =
     Node Int Double Tree Tree
@@ -130,9 +129,14 @@ getSplits :: [Datapoint] -> Int -> [Split]
 getSplits dataset i =
     [Split d1 d2 i (giniForSplit d1 d2) threshold | (d1, d2, threshold) <- allSplits]
     where
-        column = [features !! i | Datapoint features _ <- dataset]
+        column = [features !! i | Datapoint features _ <- sortedDataset]
         splitPoints = [(x2 + x1) / 2 | (x1, x2) <- zip column (tail column)]
-        allSplits = map (splitData i dataset) splitPoints
+        allSplits = map (splitData i sortedDataset) splitPoints
+        sortedDataset = sortOn (getFeature i) dataset
+
+getFeature :: Int -> Datapoint -> Double
+getFeature i (Datapoint features _) =
+    features !! i
 
 bestSplit :: Split -> [Split] -> Split
 bestSplit (Split bestLeft bestRight bestI bestGini bestT) ((Split left right i gini t):xs)
