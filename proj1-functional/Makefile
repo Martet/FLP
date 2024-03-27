@@ -6,4 +6,7 @@ flp-fun: main.hs
 clean:
 	rm -f *.o *.hi flp-fun
 
-.PHONY: all clean
+zip:
+	zip xzmitk01.zip main.hs Makefile
+
+.PHONY: all clean zip
