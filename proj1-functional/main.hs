@@ -1,12 +1,14 @@
 import System.Environment ( getArgs )
 import System.Exit ( exitFailure )
 import System.IO ( hPutStrLn, stderr )
-import Data.List ( nub, sortOn )
+import Data.List ( nub, sortBy )
+import Data.Ord ( comparing )
 import qualified Data.Text as T
 
 data Tree =
     Node Int Double Tree Tree
     | Leaf String
+    | Empty
 
 data Arguments =
     Classify String String
@@ -24,6 +26,7 @@ data Split =
 instance Show Tree where
     show n@(Node {}) = showHelper n 2
     show l@(Leaf {}) = showHelper l 2
+    show Empty = showHelper Empty 2
 
 showHelper :: Tree -> Int -> String
 showHelper (Node i t n1 n2) indent =
@@ -32,6 +35,7 @@ showHelper (Node i t n1 n2) indent =
         replicate indent ' ' ++ showHelper n2 (indent + 2)
 showHelper (Leaf l) _ =
     "Leaf: " ++ l
+showHelper Empty _ = "Empty"
 
 main :: IO ()
 main = do
@@ -39,9 +43,11 @@ main = do
     case parseArgs args of
         Just (Classify treeFile dataFile) -> do
             treeContent <- readFile treeFile
+            dataContent <- readFile dataFile
             case parseTree treeContent of
-                Just decisionTree@(Node {}) -> do
-                    dataContent <- readFile dataFile
+                decisionTree@(Node {}) -> do
+                    mapM_ (putStrLn . classify decisionTree) (parseInput dataContent parseLine)
+                decisionTree@(Leaf {}) -> do
                     mapM_ (putStrLn . classify decisionTree) (parseInput dataContent parseLine)
                 _ -> do
                     hPutStrLn stderr "Error parsing tree"
@@ -59,29 +65,31 @@ parseArgs ["-1", treeFile, dataFile] = Just (Classify treeFile dataFile)
 parseArgs ["-2", dataFile] = Just (Train dataFile)
 parseArgs _ = Nothing
 
-parseTree :: String -> Maybe Tree
-parseTree s =
-    case parseTree' (lines s) of
-        Just (t, _) -> Just t
-        Nothing -> Nothing
+parseTree :: String -> Tree
+parseTree s = tree
+    where
+        (tree, _) = parseTree' (lines s)
 
-parseTree' :: [String] -> Maybe (Tree, [String])
-parseTree' [] = Nothing
-parseTree' (x:xs) =
-    case head splitLine of
-        "Node:" ->
-            Just (Node
-                (read $ init (splitLine !! 1))
-                (read $ splitLine !! 2)
-                left
-                right, rest)
-            where
-                Just (right, rest) = parseTree' afterLeft
-                Just (left, afterLeft) = parseTree' xs
-        "Leaf:" -> Just (Leaf (last splitLine), xs)
-        _ -> Nothing
+parseTree' :: [String] -> (Tree, [String])
+parseTree' [] = (Empty, [])
+parseTree' (x:xs)
+    | len == 2 || len == 3 =
+        case head splitLine of
+            "Node:" ->
+                (Node
+                    (read $ init (splitLine !! 1))
+                    (read $ splitLine !! 2)
+                    left
+                    right, rest)
+                where
+                    (right, rest) = parseTree' afterLeft
+                    (left, afterLeft) = parseTree' xs
+            "Leaf:" -> (Leaf (last splitLine), xs)
+            _ -> (Empty, xs)
+    | otherwise = (Empty, xs)
     where
         splitLine = words x
+        len = length splitLine
 
 parseInput :: String -> (String -> a) -> [a]
 parseInput input parse =
@@ -98,6 +106,7 @@ parseLabeledLine line =
         values = map T.unpack (T.splitOn (T.pack ",") (T.pack line))
 
 classify :: Tree -> [Double] -> String
+classify Empty _ = []
 classify (Leaf label) _ = label
 classify (Node index threshold left right) values
     | values !! index < threshold = classify left values
@@ -132,7 +141,7 @@ getSplits dataset i =
         column = [features !! i | Datapoint features _ <- sortedDataset]
         splitPoints = [(x2 + x1) / 2 | (x1, x2) <- zip column (tail column)]
         allSplits = map (splitData i sortedDataset) splitPoints
-        sortedDataset = sortOn (getFeature i) dataset
+        sortedDataset = sortBy (comparing $ getFeature i) dataset
 
 getFeature :: Int -> Datapoint -> Double
 getFeature i (Datapoint features _) =
