@@ -1,5 +1,6 @@
 import System.Environment ( getArgs )
-import System.Exit ( die )
+import System.Exit ( exitFailure )
+import System.IO ( hPutStrLn, stderr )
 --import Debug.Trace
 import qualified Data.Text as T
 import Data.List ( nub )
@@ -15,6 +16,10 @@ data Arguments =
 
 data Datapoint =
     Datapoint [Double] String
+    deriving Show
+
+data Split =
+    Split [Datapoint] [Datapoint] Int Double Double
     deriving Show
 
 instance Show Tree where
@@ -39,14 +44,16 @@ main = do
                 Just decisionTree@(Node {}) -> do
                     dataContent <- readFile dataFile
                     mapM_ (putStrLn . classify decisionTree) (parseInput dataContent parseLine)
-                _ ->
-                    die "Error parsing tree"
+                _ -> do
+                    hPutStrLn stderr "Error parsing tree"
+                    exitFailure
         Just (Train dataFile) -> do
             dataContent <- readFile dataFile
             let inputData = parseInput dataContent parseLabeledLine
             print (train inputData)
-        Nothing ->
-            die "Wrong arguments"
+        Nothing -> do
+            hPutStrLn stderr "Wrong arguments"
+            exitFailure
 
 parseArgs :: [String] -> Maybe Arguments
 parseArgs ["-1", treeFile, dataFile] = Just (Classify treeFile dataFile)
@@ -99,13 +106,14 @@ classify (Node index threshold left right) values
 
 calcGini :: [Datapoint] -> Double
 calcGini dataset =
-    1 - sum [(fromIntegral (length l) / numLabels) ^ (2 :: Int) | l <- [filter (== cur) labels | cur <- nub labels]]
+    1 - sum [(fromIntegral l / numLabels) ^ (2 :: Int) | l <- labelCounts]
     where
-        numLabels = fromIntegral (length labels)
-        labels = [l | (Datapoint _ l) <- dataset]
+        numLabels = fromIntegral (length allLabels)
+        allLabels = [l | (Datapoint _ l) <- dataset]
+        labelCounts = [length (filter (== cur) allLabels) | cur <- nub allLabels]
 
-giniForSplit :: ([Datapoint], [Datapoint]) -> Double
-giniForSplit (d1, d2) =
+giniForSplit :: [Datapoint] -> [Datapoint] -> Double
+giniForSplit d1 d2 =
     calcGini d1 * len1 / total + calcGini d2 * len2 / total
     where
         len1 = fromIntegral $ length d1
@@ -118,34 +126,36 @@ splitData i dataset threshold =
     [d | d@(Datapoint features _) <- dataset, features !! i >= threshold],
     threshold)
 
-getSplits :: [Datapoint] -> Int -> [(([Datapoint], [Datapoint]), Int, Double, Double)]
+getSplits :: [Datapoint] -> Int -> [Split]
 getSplits dataset i =
-    [((d1, d2), i, giniForSplit (d1, d2), threshold) | (d1, d2, threshold) <- map (splitData i dataset) splitPoints]
+    [Split d1 d2 i (giniForSplit d1 d2) threshold | (d1, d2, threshold) <- allSplits]
     where
         column = [features !! i | Datapoint features _ <- dataset]
         splitPoints = [(x2 + x1) / 2 | (x1, x2) <- zip column (tail column)]
+        allSplits = map (splitData i dataset) splitPoints
 
-bestSplit :: (([Datapoint], [Datapoint]), Int, Double, Double) -> [(([Datapoint], [Datapoint]), Int, Double, Double)] -> (([Datapoint], [Datapoint]), Int, Double, Double)
-bestSplit (bestSets, bestI, bestGini, bestT) ((datasets, i, gini, t):xs)
-    | gini < bestGini = bestSplit (datasets, i, gini, t) xs
-    | otherwise = bestSplit (bestSets, bestI, bestGini, bestT) xs
+bestSplit :: Split -> [Split] -> Split
+bestSplit (Split bestLeft bestRight bestI bestGini bestT) ((Split left right i gini t):xs)
+    | gini < bestGini = bestSplit (Split left right i gini t) xs
+    | otherwise = bestSplit (Split bestLeft bestRight bestI bestGini bestT) xs
 bestSplit best [] = best
 
-findBestSplit :: [Datapoint] -> (([Datapoint], [Datapoint]), Int, Double)
+findBestSplit :: [Datapoint] -> ([Datapoint], [Datapoint], Int, Double)
 findBestSplit dataset =
-    ((d1, d2), i, t)
+    (d1, d2, i, t)
     where
-        splits = map (bestSplit (([],[]), 0, 99, 0) . getSplits dataset) [0..len]
-        len = featureCount (head dataset) - 1
-        ((d1, d2), i, _, t) = bestSplit (([],[]), 0, 99, 0) splits
-
-featureCount :: Datapoint -> Int
-featureCount (Datapoint features _) = length features
+        splits = map (bestSplit initSplit . getSplits dataset) [0..len]
+        len = length features - 1
+        (Split d1 d2 i _ t) = bestSplit initSplit splits
+        initSplit = Split [] [] 0 99 0
+        Datapoint features _ = head dataset
 
 train :: [Datapoint] -> Tree
 train [Datapoint _ label] =
     Leaf label
-train dataset =
-    Node i t (train left) (train right)
+train dataset
+    | calcGini dataset == 0 = Leaf label
+    | otherwise = Node i t (train left) (train right)
     where
-        ((left, right), i, t) = findBestSplit dataset
+        (left, right, i, t) = findBestSplit dataset
+        Datapoint _ label = head dataset
