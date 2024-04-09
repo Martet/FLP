@@ -9,7 +9,7 @@ import System.Exit ( exitFailure )
 import System.IO ( hPutStrLn, stderr )
 import Data.List ( nub, sortBy )
 import Data.Ord ( comparing )
-import qualified Data.Text as T -- for splitOn
+import Data.Text (splitOn, pack, unpack)
 
 -- decision tree
 data Tree =
@@ -129,7 +129,7 @@ parseInput input parse =
 -- @return [Double] list of features
 parseLine :: String -> [Double]
 parseLine line =
-    map (read . T.unpack) (T.splitOn (T.pack ",") (T.pack line))
+    map (read . unpack) (splitOn (pack ",") (pack line))
 
 -- Parses labeled line by splitting on commas and saving last as label
 -- @param String line to parse
@@ -138,7 +138,7 @@ parseLabeledLine :: String -> Datapoint
 parseLabeledLine line =
     Datapoint (map read $ init values) (last values)
     where
-        values = map T.unpack (T.splitOn (T.pack ",") (T.pack line))
+        values = map unpack (splitOn (pack ",") (pack line))
 
 -- Classifies an object
 -- @param Tree decision tree to use
