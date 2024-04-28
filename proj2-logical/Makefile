@@ -7,7 +7,7 @@ clean:
 	rm -f flp23-log
 
 zip:
-	zip flp-log-xzmitk01.zip flp23-log.pl Makefile Readme.md
+	zip flp-log-xzmitk01.zip flp23-log.pl Makefile README.md
 
 run: flp23-log
 	./flp23-log

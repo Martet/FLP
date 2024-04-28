@@ -1,7 +1,7 @@
 /**
  * Projekt 2 (logicky) z FLP
  * Autor: Martin Zmitko (xzmitk01@stud.fit.vutbr.cz)
- * Datum: 2021-04-28
+ * Datum: 2024-04-28
  * Popis: Program nalezne vsechny hamiltonovy kruznice v grafu
  */
 
