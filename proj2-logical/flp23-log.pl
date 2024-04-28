@@ -7,7 +7,7 @@
 
 :- dynamic edge/2. % pro hrany
 :- dynamic path/1. % pro optimalizaci hledani cest
-:- dynamic circle/1. % pro nalezeni unikatnich kruznic
+:- dynamic nodeCount/1. % pro pocet uzlu v grafu
 
 /** Input/Output, implementace z input2.pl */
 
@@ -54,9 +54,12 @@ make_edges([H|T]) :-
 	assertz(edge(N1, N2)),
 	assertz(edge(N2, N1)), % obousmerna hrana
 	make_edges(T).
+make_edges([_|T]) :-
+	make_edges(T).
 
 
 /** vypise kruznici v pozadovanem formatu*/
+write_circle([]).
 write_circle([H]) :-
 	writeln(H).
 write_circle([H|T]) :-
@@ -65,23 +68,23 @@ write_circle([H|T]) :-
 
 
 /** Nalezena cesta je hamiltonova kruznice */
-hamilton_circle(1, Node, [Next|RestPath], [Next|RestPath]) :-
+hamilton_circle(Node, [Next|RestPath], [Next|RestPath]) :-
 	\+ path([Next|RestPath]), % pokud cesta neexistuje
+	length([Next|RestPath], N),
+	nodeCount(N), % delka cesty je rovna poctu uzlu
 	edge(Node, Next), % existuje hrana mezi pocatecnim a koncovym uzlem
 	assertz(path([Next|RestPath])).
 
 /** Predikat pro nalezeni hamiltonovy kruznice
- *  Count - pocet uzlu, ktere zbyvaji pridat do cesty
  *  Node - aktualni uzel
  *  Path - dosavadni cesta
  *  Result - vysledna kruznice jako seznam uzlu
  */
-hamilton_circle(Count, Node, Path, Result) :-
+hamilton_circle(Node, Path, Result) :-
 	edge(Node, NewNode), % existuje hrana mezi aktualnim a dalsim uzlem
 	\+ member(NewNode, Path), % dalsi uzel neni v ceste
 	append(Path, [NewNode], NewPath), % pridani dalsiho uzlu do cesty
-	NewCount is Count - 1, % snizeni poctu uzlu, ktere zbyvaji pridat do cesty
-	hamilton_circle(NewCount, NewNode, NewPath, Result).
+	hamilton_circle(NewNode, NewPath, Result).
 
 
 /** Prevod seznamu seznamu cest jako uzlu na seznam seznamu hran 
@@ -89,7 +92,8 @@ hamilton_circle(Count, Node, Path, Result) :-
 */
 nodes_to_edges([], []).
 nodes_to_edges([Nodes|NodesRest], [Edges|EdgesRest]) :-
-	nodes_to_edges_(Nodes, Edges),
+	nodes_to_edges_(Nodes, Edgess),
+	connect_path(Edgess, Edges),
 	nodes_to_edges(NodesRest, EdgesRest).
 
 /** Prevod seznamu uzlu na seznam hran bez posledni */
@@ -98,16 +102,9 @@ nodes_to_edges_([_], []).
 nodes_to_edges_([Node1,Node2|Rest], [Node1-Node2|Edges]) :-
     nodes_to_edges_([Node2|Rest], Edges).
 
-
-/** Spojeni prvniho a posledniho uzlu v seznamu kruznic 
- * [[a-b,b-c],[b-c,c-a]] -> [[a-b,b-c,c-a],[b-c,c-a,a-b]]
-*/
-connect_paths([], []).
-connect_paths([Path|Rest], [Result|ResultList]) :-
-	connect_path(Path, Result),
-	connect_paths(Rest, ResultList).
-
-/** Spojeni prvniho a posledniho uzlu v kruznici */
+/** Spojeni prvniho a posledniho uzlu v kruznici
+ * [[a-b,b-c]] -> [[c-a,a-b,b-c]]
+ */
 connect_path(Unclosed, Closed) :-
 	[First-_|Tail] = Unclosed,
 	last(Tail, _-Last),
@@ -140,14 +137,14 @@ main :-
 	findall(Nodee, edge(Nodee, _), DupNodes), % ziska seznam vsech uzlu
 	sort(DupNodes, Nodes), % zajisteni unikatnosti uzlu
 	length(Nodes, N), % zjisti pocet uzlu == delka vysledne kruznice
+	assertz(nodeCount(N)),
 
 	% najde vsechny hamiltonovy kruznice pro vsechny pocatecni uzly jako seznamy uzlu do Paths
-	findall(Path, (edge(Node, _), hamilton_circle(N, Node, [Node], Path)), Paths),
+	findall(Path, (member(Node, Nodes), hamilton_circle(Node, [Node], Path)), Paths),
 	nodes_to_edges(Paths, Circles),
-	connect_paths(Circles, ConnectedCircles),
 
 	% serazeni kruznic pro zajisteni unikatnosti
-	sort_circles(ConnectedCircles, SortedFirst),
-	sort(SortedFirst, UniqueCircles),
+	sort_circles(Circles, SortedCircles),
+	sort(SortedCircles, UniqueCircles),
 	maplist(write_circle, UniqueCircles),
 	halt.
